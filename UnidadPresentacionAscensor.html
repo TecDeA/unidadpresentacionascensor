@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de LEDs Interactivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --led-color-red: #ef4444;
+            --led-glow-red: 0 0 15px #ef4444, 0 0 25px #ef4444;
+            --led-color-yellow: #facc15;
+            --led-glow-yellow: 0 0 15px #facc15, 0 0 25px #facc15;
+            --led-color-green: #4ade80;
+            --led-glow-green: 0 0 15px #4ade80, 0 0 25px #4ade80;
+            --led-color-orange: #fb923c;
+            --led-glow-orange: 0 0 15px #fb923c, 0 0 25px #fb923c;
+            --led-color-blue: #60a5fa;
+            --led-glow-blue: 0 0 15px #60a5fa, 0 0 25px #60a5fa;
+            --led-color-violet: #a78bfa;
+            --led-glow-violet: 0 0 15px #a78bfa, 0 0 25px #a78bfa;
+            --led-off-color: #374151; /* gray-700 */
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Estilo para los interruptores deslizantes */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #4b5563; /* gray-600 */
+            transition: .4s;
+            border-radius: 28px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--led-on-color, #4ade80);
+        }
+
+        input:focus + .slider {
+            box-shadow: 0 0 1px var(--led-on-color, #4ade80);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+        
+        /* Estilos para el SVG */
+        .led-shape {
+            fill: var(--led-off-color);
+            stroke: #9ca3af; /* gray-400 */
+            stroke-width: 2;
+            transition: fill 0.3s ease, filter 0.3s ease;
+            cursor: pointer;
+        }
+
+        .led-shape.on {
+            fill: var(--led-on-color, #4ade80);
+            filter: drop-shadow(var(--led-on-glow, 0 0 15px #4ade80));
+            stroke: #f3f4f6; /* gray-100 */
+        }
+        
+        /* Estilos para secciones desplegables */
+        .collapsible-content {
+            transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out, padding 0.5s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+
+        .collapsible-content.open {
+            max-height: 500px;
+            opacity: 1;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+
+        .code-display {
+            font-family: 'Roboto Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 to-slate-800 text-white flex items-center justify-center min-h-screen p-4">
+
+    <main class="w-full max-w-lg mx-auto bg-gray-800/70 backdrop-blur-sm border border-gray-700/50 rounded-2xl shadow-2xl p-6 md:p-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-center mb-6 uppercase tracking-wider">Unidad de presentación</h1>
+
+        <!-- Contenedor principal de la UI de LEDs -->
+        <div class="relative w-full max-w-xs mx-auto mb-8" style="aspect-ratio: 250 / 519;">
+            <!-- SVG con los 5 LEDs -->
+            <svg id="led-unit" class="absolute inset-0 w-full h-full" viewBox="0 0 250.35 518.94">
+                <!-- LSB: Bit 0 --><polygon id="led-0" data-bit="0" class="led-shape" points="0,0 115.47,57.04 64.86,259.47" />
+                <!-- Bit 1 --><polygon id="led-1" data-bit="1" class="led-shape" points="250.35,0 134.87,57.04 185.48,259.47" />
+                <!-- Bit 2 --><polygon id="led-2" data-bit="2" class="led-shape" points="75.17,259.47 125.17,59.47 175.17,259.47 125.17,459.47" />
+                <!-- Bit 3 --><polygon id="led-3" data-bit="3" class="led-shape" points="250.35,518.94 134.87,461.89 185.48,259.47" />
+                <!-- MSB: Bit 4 --><polygon id="led-4" data-bit="4" class="led-shape" points="0,518.94 115.47,461.89 64.86,259.47" />
+            </svg>
+        </div>
+        
+        <!-- Secciones de Control -->
+        <div class="space-y-4">
+            <!-- Sección de Selección de Color -->
+            <div class="bg-gray-700/50 rounded-lg">
+                <h2 id="color-toggle" class="cursor-pointer p-4 relative font-bold text-lg text-center flex justify-between items-center">
+                    <span>🎨 Selección de Color</span>
+                    <svg id="color-chevron-icon" class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </h2>
+                <div id="color-options" class="collapsible-content px-4">
+                    <select id="color-selector" class="w-full p-3 bg-gray-800 border-2 border-gray-600 rounded-md focus:outline-none focus:border-blue-500 transition"></select>
+                </div>
+            </div>
+
+            <!-- Sección de Controles Manuales -->
+            <div class="bg-gray-700/50 rounded-lg p-4">
+                <h2 class="font-bold text-lg mb-3 text-center">Controles Manuales</h2>
+                <div class="flex justify-around items-start text-center">
+                    <div class="flex flex-col items-center space-y-1"><p class="text-xs text-gray-400">BIT 4</p><label class="switch"><input type="checkbox" data-bit="4"><span class="slider"></span></label></div>
+                    <div class="flex flex-col items-center space-y-1"><p class="text-xs text-gray-400">BIT 3</p><label class="switch"><input type="checkbox" data-bit="3"><span class="slider"></span></label></div>
+                    <div class="flex flex-col items-center space-y-1"><p class="text-xs text-gray-400">BIT 2</p><label class="switch"><input type="checkbox" data-bit="2"><span class="slider"></span></label></div>
+                    <div class="flex flex-col items-center space-y-1"><p class="text-xs text-gray-400">BIT 1</p><label class="switch"><input type="checkbox" data-bit="1"><span class="slider"></span></label></div>
+                    <div class="flex flex-col items-center space-y-1"><p class="text-xs text-gray-400">BIT 0</p><label class="switch"><input type="checkbox" data-bit="0"><span class="slider"></span></label></div>
+                </div>
+            </div>
+            
+            <!-- Sección de Control de Secuencia -->
+            <div class="bg-gray-700/50 rounded-lg">
+                <h2 id="sequence-toggle" class="cursor-pointer p-4 relative font-bold text-lg text-center flex justify-between items-center">
+                    <span>⚙️ Control de Secuencia</span>
+                     <svg id="sequence-chevron-icon" class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </h2>
+                <div id="sequence-options" class="collapsible-content px-4">
+                    <div class="flex flex-col space-y-4">
+                        <select id="preset-selector" class="w-full p-3 bg-gray-800 border-2 border-gray-600 rounded-md focus:outline-none focus:border-blue-500 transition"></select>
+                        
+                        <!-- Deslizador de Velocidad -->
+                        <div class="flex flex-col space-y-2 pt-2">
+                            <div class="flex justify-between items-center text-xs text-gray-400">
+                                <label for="speed-slider">Velocidad</label>
+                                <span id="speed-value" class="font-mono">500 ms</span>
+                            </div>
+                            <input id="speed-slider" type="range" min="100" max="2000" value="500" step="50" class="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-violet-500">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                            <button id="start-btn" class="flex items-center justify-center space-x-2 p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-md hover:from-green-600 disabled:from-gray-600 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-lg hover:shadow-green-500/50"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg><span>Inicio</span></button>
+                            <button id="stop-btn" class="flex items-center justify-center space-x-2 p-2 bg-gradient-to-br from-red-500 to-red-600 rounded-md hover:from-red-600 disabled:from-gray-600 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-lg hover:shadow-red-500/50"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5.5 5.5A.5.5 0 016 5h8a.5.5 0 01.5.5v8a.5.5 0 01-.5.5H6a.5.5 0 01-.5-.5v-8z"></path></svg><span>Detener</span></button>
+                            <button id="step-btn" class="flex items-center justify-center space-x-2 p-2 bg-gradient-to-br from-blue-500 to-blue-600 rounded-md hover:from-blue-600 disabled:from-gray-600 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-lg hover:shadow-blue-500/50"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M5.5 5.022A.5.5 0 016 5v10a.5.5 0 01-.5.5.5.5 0 01-.5-.5V5.5a.5.5 0 01.5-.478zM14.5 5.022a.5.5 0 01.5.478v9a.5.5 0 01-.5.5.5.5 0 01-.5-.5v-9a.5.5 0 01.5-.478zM9.3 2.841A1.5 1.5 0 0111 4.11V15.89a1.5 1.5 0 01-1.7 1.269l-3-1.5a1.5 1.5 0 010-2.538l3-1.5z"></path></svg><span>Paso</span></button>
+                            <button id="reset-btn" class="flex items-center justify-center space-x-2 p-2 bg-gradient-to-br from-gray-500 to-gray-600 rounded-md hover:from-gray-600 disabled:from-gray-600 disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-lg hover:shadow-gray-500/50"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M8.22 6.02a.75.75 0 011.06 0l2.25 2.25a.75.75 0 010 1.06l-2.25 2.25a.75.75 0 01-1.06-1.06L9.94 10 8.22 8.31a.75.75 0 010-1.06zM4.75 10a5.25 5.25 0 1110.5 0 5.25 5.25 0 01-10.5 0z" clip-rule="evenodd" fill-rule="evenodd"></path></svg><span>Reset</span></button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección de Salida Binaria/Hexadecimal -->
+            <div class="bg-gray-700/50 rounded-lg p-4">
+                 <h2 class="font-bold text-lg mb-3 text-center">Valores Digitales</h2>
+                <div class="flex justify-around items-center text-center">
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Binario (MSB..LSB)</p>
+                        <p id="binary-output" class="code-display text-2xl font-bold text-green-400">00000</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-400 mb-1">Hexadecimal</p>
+                        <p id="hex-output" class="code-display text-2xl font-bold text-violet-400">00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- ESTADO DE LA APLICACIÓN ---
+            const ledStates = [0, 0, 0, 0, 0]; // LSB a la izquierda (índice 0)
+            let currentColor = 'green';
+            let sequenceInterval = null;
+            let activeSequence = [];
+            let currentStepIndex = 0;
+            let sequenceSpeed = 500;
+            
+            const colorMap = {
+                red:    { name: 'Rojo',    hex: '#ef4444' },
+                yellow: { name: 'Amarillo',hex: '#facc15' },
+                green:  { name: 'Verde',   hex: '#4ade80' },
+                orange: { name: 'Naranja', hex: '#fb923c' },
+                blue:   { name: 'Azul',    hex: '#60a5fa' },
+                violet: { name: 'Violeta', hex: '#a78bfa' }
+            };
+            
+            const presets = [
+                { name: 'Seleccionar secuencia...', sequence: [] },
+                { name: 'Contador 0-31', sequence: Array.from({length: 32}, (_, i) => i) },
+                { name: 'Contador 31-0', sequence: Array.from({length: 32}, (_, i) => 31 - i) },
+                { name: 'Knight Rider', sequence: [1, 2, 4, 8, 16, 8, 4, 2] },
+                { name: 'Desplazamiento Circular', sequence: [1, 2, 4, 8, 16] },
+                { name: 'Alternar (10101/01010)', sequence: [21, 10, 21, 10, 21, 10] },
+                { name: 'Aleatorio', sequence: Array.from({length: 20}, () => Math.floor(Math.random() * 32)) },
+                { name: 'Explosión', sequence: [4, 10, 21, 0] },
+            ];
+
+            // --- REFERENCIAS AL DOM ---
+            const ledShapes = document.querySelectorAll('.led-shape');
+            const switches = document.querySelectorAll('.switch input');
+            const binaryOutput = document.getElementById('binary-output');
+            const hexOutput = document.getElementById('hex-output');
+            const root = document.documentElement;
+
+            const colorSelector = document.getElementById('color-selector');
+            const colorToggle = document.getElementById('color-toggle');
+            const colorOptions = document.getElementById('color-options');
+            const colorChevronIcon = document.getElementById('color-chevron-icon');
+
+            const presetSelector = document.getElementById('preset-selector');
+            const startBtn = document.getElementById('start-btn');
+            const stopBtn = document.getElementById('stop-btn');
+            const stepBtn = document.getElementById('step-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const sequenceToggle = document.getElementById('sequence-toggle');
+            const sequenceOptions = document.getElementById('sequence-options');
+            const sequenceChevronIcon = document.getElementById('sequence-chevron-icon');
+            const speedSlider = document.getElementById('speed-slider');
+            const speedValue = document.getElementById('speed-value');
+
+            // --- FUNCIONES ---
+            function setLedsFromDecimal(decimalValue) {
+                for (let i = 0; i < 5; i++) {
+                    ledStates[i] = ((decimalValue >> i) & 1) ? 1 : 0;
+                }
+                updateUI();
+            }
+
+            function updateUI() {
+                let decimalValue = 0;
+                ledStates.forEach((state, bit) => {
+                    const led = document.getElementById(`led-${bit}`);
+                    const sw = document.querySelector(`.switch input[data-bit="${bit}"]`);
+                    if (state === 1) {
+                        led.classList.add('on');
+                        sw.checked = true;
+                        decimalValue += 2 ** bit;
+                    } else {
+                        led.classList.remove('on');
+                        sw.checked = false;
+                    }
+                });
+                const binaryString = ledStates.slice().reverse().join('');
+                binaryOutput.textContent = binaryString;
+                hexOutput.textContent = decimalValue.toString(16).toUpperCase().padStart(2, '0');
+            }
+
+            function setGlobalColor(colorName) {
+                currentColor = colorName;
+                root.style.setProperty('--led-on-color', `var(--led-color-${colorName})`);
+                root.style.setProperty('--led-on-glow', `var(--led-glow-${colorName})`);
+                const selectedOption = colorSelector.querySelector(`option[value="${colorName}"]`);
+                if (selectedOption) {
+                    colorSelector.style.backgroundColor = colorMap[colorName].hex;
+                    colorSelector.style.color = isDark(colorMap[colorName].hex) ? 'white' : 'black';
+                }
+            }
+
+            function isDark(hex) {
+                const [r, g, b] = hex.match(/\w\w/g).map(x => parseInt(x, 16));
+                return (r * 0.299 + g * 0.587 + b * 0.114) < 140;
+            }
+
+            function toggleLedState(bit) {
+                handleStop();
+                ledStates[bit] = 1 - ledStates[bit];
+                updateUI();
+            }
+
+            function initializeSelectors() {
+                for (const [key, value] of Object.entries(colorMap)) {
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = value.name;
+                    option.style.backgroundColor = value.hex;
+                    option.style.color = isDark(value.hex) ? 'white' : 'black';
+                    colorSelector.appendChild(option);
+                }
+                colorSelector.value = currentColor;
+                
+                presets.forEach((preset, index) => {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = preset.name;
+                    presetSelector.appendChild(option);
+                });
+            }
+
+            // --- LÓGICA DE SECUENCIA ---
+            function handleStart() {
+                if (sequenceInterval || activeSequence.length === 0) return;
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                stepBtn.disabled = true;
+                presetSelector.disabled = true;
+                sequenceInterval = setInterval(() => handleStep(true), sequenceSpeed);
+            }
+
+            function handleStop() {
+                clearInterval(sequenceInterval);
+                sequenceInterval = null;
+                startBtn.disabled = activeSequence.length === 0;
+                stopBtn.disabled = true;
+                stepBtn.disabled = activeSequence.length === 0;
+                presetSelector.disabled = false;
+            }
+
+            function handleStep(isAuto = false) {
+                if (!isAuto && sequenceInterval) return;
+                if (activeSequence.length === 0) return;
+                currentStepIndex = (currentStepIndex + 1) % activeSequence.length;
+                setLedsFromDecimal(activeSequence[currentStepIndex]);
+            }
+
+            function handleReset() {
+                handleStop();
+                currentStepIndex = 0;
+                setLedsFromDecimal(activeSequence.length > 0 ? activeSequence[0] : 0);
+            }
+
+            // --- EVENT LISTENERS ---
+            ledShapes.forEach(shape => shape.addEventListener('click', () => toggleLedState(parseInt(shape.dataset.bit))));
+            
+            switches.forEach(sw => {
+                sw.addEventListener('change', () => {
+                    handleStop();
+                    ledStates[parseInt(sw.dataset.bit)] = sw.checked ? 1 : 0;
+                    updateUI();
+                });
+            });
+
+            colorSelector.addEventListener('change', (e) => setGlobalColor(e.target.value));
+            
+            colorToggle.addEventListener('click', () => {
+                colorOptions.classList.toggle('open');
+                colorChevronIcon.classList.toggle('rotate-180');
+            });
+
+            sequenceToggle.addEventListener('click', () => {
+                sequenceOptions.classList.toggle('open');
+                sequenceChevronIcon.classList.toggle('rotate-180');
+            });
+            
+            presetSelector.addEventListener('change', (e) => {
+                const presetIndex = e.target.value;
+                activeSequence = presets[presetIndex].sequence;
+                handleReset();
+            });
+
+            speedSlider.addEventListener('input', e => {
+                sequenceSpeed = parseInt(e.target.value);
+                speedValue.textContent = `${sequenceSpeed} ms`;
+                if (sequenceInterval) {
+                    clearInterval(sequenceInterval);
+                    sequenceInterval = setInterval(() => handleStep(true), sequenceSpeed);
+                }
+            });
+
+            startBtn.addEventListener('click', handleStart);
+            stopBtn.addEventListener('click', handleStop);
+            stepBtn.addEventListener('click', () => handleStep(false));
+            resetBtn.addEventListener('click', handleReset);
+
+            // --- INICIALIZACIÓN ---
+            initializeSelectors();
+            setGlobalColor(currentColor);
+            updateUI();
+            handleReset();
+        });
+    </script>
+</body>
+</html>
