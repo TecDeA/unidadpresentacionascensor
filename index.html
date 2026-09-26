@@ -2,14 +2,26 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Panel de LEDs Interactivo</title>
+    <meta name="description" content="Simulador interactivo de la unidad de presentación de un ascensor: panel de 5 LEDs binarios con control manual y secuencias.">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Panel LEDs">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            color-scheme: dark;
             --led-color-red: #ef4444;
             --led-glow-red: 0 0 15px #ef4444, 0 0 25px #ef4444;
             --led-color-yellow: #facc15;
@@ -25,8 +37,39 @@
             --led-off-color: #374151; /* gray-700 */
         }
 
+        html {
+            -webkit-text-size-adjust: 100%;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            /* Respetar las áreas seguras (notch, barra inferior) en móvil */
+            padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+        }
+
+        /* Optimizaciones táctiles: sin zoom por doble toque ni selección accidental */
+        .led-shape, .switch, button, select, input[type="range"] {
+            touch-action: manipulation;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        /* Objetivos táctiles más grandes en pantallas táctiles */
+        @media (pointer: coarse) {
+            .switch {
+                width: 58px;
+                height: 32px;
+            }
+
+            .slider:before {
+                height: 24px;
+                width: 24px;
+            }
+
+            input:checked + .slider:before {
+                transform: translateX(26px);
+            }
         }
 
         /* Estilo para los interruptores deslizantes */
@@ -116,7 +159,7 @@
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-gray-900 to-slate-800 text-white flex items-center justify-center min-h-screen p-4">
+<body class="bg-gradient-to-br from-gray-900 to-slate-800 text-white flex items-center justify-center min-h-dvh">
 
     <main class="w-full max-w-lg mx-auto bg-gray-800/70 backdrop-blur-sm border border-gray-700/50 rounded-2xl shadow-2xl p-6 md:p-8">
         <h1 class="text-2xl md:text-3xl font-bold text-center mb-6 uppercase tracking-wider">Unidad de presentación</h1>
@@ -405,6 +448,15 @@
             setGlobalColor(currentColor);
             updateUI();
             handleReset();
+
+            // --- REGISTRO DEL SERVICE WORKER (PWA) ---
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js').catch(err => {
+                        console.warn('No se pudo registrar el service worker:', err);
+                    });
+                });
+            }
         });
     </script>
 </body>
