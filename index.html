@@ -400,10 +400,36 @@
             }
 
             // Actualiza el chip de versión y revela el chip con una transición suave.
+            // Solo actualiza si aún no tenemos una versión (evita sobrescribir con valores vacíos).
+            let versionResolved = false;
             function setAppVersion(version) {
-                if (!version) return;
+                if (!version || versionResolved) return;
+                versionResolved = true;
                 versionText.textContent = version;
                 versionChip.classList.add('ready');
+            }
+
+            // Marca el chip como "no disponible" tras agotar todas las estrategias.
+            function markVersionUnavailable() {
+                if (versionResolved) return;
+                versionText.textContent = '—';
+                versionChip.classList.add('ready');
+            }
+
+            // Estrategia principal: leer el archivo ./sw.js y extraer CACHE_NAME.
+            // Funciona en cuanto el archivo es accesible por HTTP(S), sin esperar a que
+            // el SW se instale o tome el control (típico problema en la primera visita).
+            async function fetchVersionFromSWFile() {
+                try {
+                    const response = await fetch('./sw.js', { cache: 'no-store' });
+                    if (!response.ok) return null;
+                    const text = await response.text();
+                    // Tolerante a comillas simples o dobles y a espacios alrededor del '='.
+                    const match = text.match(/CACHE_NAME\s*=\s*['"]panel-leds-([^'"]+)['"]/);
+                    return match ? match[1] : null;
+                } catch (e) {
+                    return null;
+                }
             }
 
             // --- LÓGICA DE SECUENCIA ---
@@ -487,18 +513,31 @@
             updateUI();
             handleReset();
 
+            // --- EXTRACCIÓN DE LA VERSIÓN DEL SERVICE WORKER ---
+            // Estrategia principal: leer ./sw.js y extraer CACHE_NAME con regex.
+            // Esto funciona en cuanto el archivo es accesible por HTTP(S), incluso
+            // antes de que el SW se instale o tome el control de la página.
+            fetchVersionFromSWFile().then((version) => {
+                if (version) {
+                    setAppVersion(version);
+                }
+                // Si fetch falla (p. ej. file://), dependemos del SW messaging más abajo.
+            });
+
             // --- REGISTRO DEL SERVICE WORKER (PWA) ---
+            // El SW también expone su versión vía postMessage como mecanismo secundario,
+            // útil para detectar actualizaciones en caliente (nueva versión desplegada).
             if ('serviceWorker' in navigator) {
-                // Escucha mensajes entrantes del SW: el SW envía { type: 'APP_VERSION', version }
-                // al activarse y como respuesta a GET_APP_VERSION.
                 navigator.serviceWorker.addEventListener('message', (event) => {
                     const data = event.data || {};
                     if (data.type === 'APP_VERSION' && data.version) {
+                        // Forzamos la actualización aunque ya tengamos una versión,
+                        // porque el SW puede haber cambiado tras un update.
+                        versionResolved = false;
                         setAppVersion(data.version);
                     }
                 });
 
-                // Cuando un nuevo SW toma el control, se le pide la versión para refrescar el chip.
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
                     if (navigator.serviceWorker.controller) {
                         navigator.serviceWorker.controller.postMessage({ type: 'GET_APP_VERSION' });
@@ -509,22 +548,20 @@
                     navigator.serviceWorker.register('./sw.js')
                         .then(() => navigator.serviceWorker.ready)
                         .then(() => {
-                            // Si ya hay un SW controlando la página, pedirle la versión.
                             if (navigator.serviceWorker.controller) {
                                 navigator.serviceWorker.controller.postMessage({ type: 'GET_APP_VERSION' });
                             }
-                            // Si no lo hay todavía, el SW la enviará automáticamente en su activate.
                         })
                         .catch(err => {
                             console.warn('No se pudo registrar el service worker:', err);
-                            versionText.textContent = 'N/A';
-                            versionChip.classList.add('ready');
+                            // Si tras un margen prudencial no se ha resuelto la versión,
+                            // marcamos el chip como no disponible.
+                            setTimeout(() => markVersionUnavailable(), 1500);
                         });
                 });
             } else {
-                // Navegador sin soporte para SW: mostrar estado neutro.
-                versionText.textContent = 'N/A';
-                versionChip.classList.add('ready');
+                // Navegador sin soporte para SW: si fetch tampoco funcionó, mostrar guion.
+                setTimeout(() => markVersionUnavailable(), 1500);
             }
         });
     </script>
