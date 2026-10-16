@@ -416,17 +416,19 @@
                 versionChip.classList.add('ready');
             }
 
-            // Estrategia principal: leer el archivo ./sw.js y extraer CACHE_NAME.
+            // Estrategia principal: leer el archivo ./sw.js y extraer APP_VERSION.
             // Funciona en cuanto el archivo es accesible por HTTP(S), sin esperar a que
             // el SW se instale o tome el control (típico problema en la primera visita).
+            // Soporta comillas simples, dobles y template literals (sin ${...}).
             async function fetchVersionFromSWFile() {
                 try {
                     const response = await fetch('./sw.js', { cache: 'no-store' });
                     if (!response.ok) return null;
                     const text = await response.text();
-                    // Tolerante a comillas simples o dobles y a espacios alrededor del '='.
-                    const match = text.match(/CACHE_NAME\s*=\s*['"]panel-leds-([^'"]+)['"]/);
-                    return match ? match[1] : null;
+                    // Busca `const APP_VERSION = '2.2'` / `"2.2"` / `` `2.2` ``
+                    // y descarta valores dinámicos tipo `${...}`.
+                    const match = text.match(/APP_VERSION\s*=\s*(['"`])([^'"`${]+)\1/);
+                    return match ? match[2].trim() : null;
                 } catch (e) {
                     return null;
                 }
