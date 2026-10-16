@@ -1,5 +1,9 @@
 const CACHE_NAME = 'panel-leds-v2';
 
+// Versión de la aplicación extraída dinámicamente del nombre de caché.
+// Se expone a los clientes controlados vía postMessage para mostrarla en la UI.
+const APP_VERSION = CACHE_NAME.replace(/^panel-leds-/, '');
+
 // Recursos locales precargados en la instalación
 const PRECACHE = [
     './',
@@ -28,7 +32,20 @@ self.addEventListener('activate', (event) => {
         caches.keys()
             .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
             .then(() => self.clients.claim())
+            .then(() => self.clients.matchAll({ includeUncontrolled: true }))
+            .then((clients) => {
+                clients.forEach((client) => {
+                    client.postMessage({ type: 'APP_VERSION', version: APP_VERSION });
+                });
+            })
     );
+});
+
+// Permite a las páginas solicitar la versión activa del SW en cualquier momento.
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'GET_APP_VERSION') {
+        event.source.postMessage({ type: 'APP_VERSION', version: APP_VERSION });
+    }
 });
 
 self.addEventListener('fetch', (event) => {
