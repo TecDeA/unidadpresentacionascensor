@@ -1,4 +1,4 @@
-const CACHE_NAME = 'panel-leds-v2';
+const CACHE_NAME = 'panel-leds-v2.2';
 
 // Versión de la aplicación extraída dinámicamente del nombre de caché.
 // Se expone a los clientes controlados vía postMessage para mostrarla en la UI.
