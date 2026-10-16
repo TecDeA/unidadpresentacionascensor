@@ -157,12 +157,39 @@
         .code-display {
             font-family: 'Roboto Mono', monospace;
         }
+
+        /* Chip dinámico de versión */
+        .version-chip {
+            opacity: 0;
+            transform: translateY(-4px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .version-chip.ready {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .version-chip { transition: none; transform: none; opacity: 1; }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 to-slate-800 text-white flex items-center justify-center min-h-dvh">
 
     <main class="w-full max-w-lg mx-auto bg-gray-800/70 backdrop-blur-sm border border-gray-700/50 rounded-2xl shadow-2xl p-6 md:p-8">
-        <h1 class="text-2xl md:text-3xl font-bold text-center mb-6 uppercase tracking-wider">Unidad de presentación</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-center mb-2 uppercase tracking-wider">Unidad de presentación</h1>
+
+        <!-- Chip dinámico con la versión extraída del service worker -->
+        <div class="flex justify-center mb-6">
+            <span id="version-chip"
+                  class="version-chip inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono bg-gray-700/60 border border-gray-600/50 text-gray-300 backdrop-blur-sm"
+                  role="status"
+                  aria-live="polite">
+                <span class="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" aria-hidden="true"></span>
+                <span class="text-gray-400">v</span><span id="version-text">…</span>
+            </span>
+        </div>
 
         <!-- Contenedor principal de la UI de LEDs -->
         <div class="relative w-full max-w-xs mx-auto mb-8" style="aspect-ratio: 250 / 519;">
@@ -300,6 +327,10 @@
             const speedSlider = document.getElementById('speed-slider');
             const speedValue = document.getElementById('speed-value');
 
+            // Referencias del chip de versión
+            const versionChip = document.getElementById('version-chip');
+            const versionText = document.getElementById('version-text');
+
             // --- FUNCIONES ---
             function setLedsFromDecimal(decimalValue) {
                 for (let i = 0; i < 5; i++) {
@@ -366,6 +397,13 @@
                     option.textContent = preset.name;
                     presetSelector.appendChild(option);
                 });
+            }
+
+            // Actualiza el chip de versión y revela el chip con una transición suave.
+            function setAppVersion(version) {
+                if (!version) return;
+                versionText.textContent = version;
+                versionChip.classList.add('ready');
             }
 
             // --- LÓGICA DE SECUENCIA ---
@@ -451,11 +489,42 @@
 
             // --- REGISTRO DEL SERVICE WORKER (PWA) ---
             if ('serviceWorker' in navigator) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker.register('./sw.js').catch(err => {
-                        console.warn('No se pudo registrar el service worker:', err);
-                    });
+                // Escucha mensajes entrantes del SW: el SW envía { type: 'APP_VERSION', version }
+                // al activarse y como respuesta a GET_APP_VERSION.
+                navigator.serviceWorker.addEventListener('message', (event) => {
+                    const data = event.data || {};
+                    if (data.type === 'APP_VERSION' && data.version) {
+                        setAppVersion(data.version);
+                    }
                 });
+
+                // Cuando un nuevo SW toma el control, se le pide la versión para refrescar el chip.
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({ type: 'GET_APP_VERSION' });
+                    }
+                });
+
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(() => navigator.serviceWorker.ready)
+                        .then(() => {
+                            // Si ya hay un SW controlando la página, pedirle la versión.
+                            if (navigator.serviceWorker.controller) {
+                                navigator.serviceWorker.controller.postMessage({ type: 'GET_APP_VERSION' });
+                            }
+                            // Si no lo hay todavía, el SW la enviará automáticamente en su activate.
+                        })
+                        .catch(err => {
+                            console.warn('No se pudo registrar el service worker:', err);
+                            versionText.textContent = 'N/A';
+                            versionChip.classList.add('ready');
+                        });
+                });
+            } else {
+                // Navegador sin soporte para SW: mostrar estado neutro.
+                versionText.textContent = 'N/A';
+                versionChip.classList.add('ready');
             }
         });
     </script>
