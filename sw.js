@@ -1,8 +1,10 @@
-const CACHE_NAME = 'panel-leds-v2.2';
+// Versión de la aplicación. ÚNICA fuente de verdad: cualquier cambio aquí
+// se refleja automáticamente en el chip de la UI (vía fetch + postMessage)
+// y en el nombre de la caché. Formato libre: '2', '2.2', '2.2.0-beta', etc.
+const APP_VERSION = '2.2';
 
-// Versión de la aplicación extraída dinámicamente del nombre de caché.
-// Se expone a los clientes controlados vía postMessage para mostrarla en la UI.
-const APP_VERSION = CACHE_NAME.replace(/^panel-leds-/, '');
+// El nombre de la caché se deriva de la versión: bump de versión = nueva caché.
+const CACHE_NAME = `panel-leds-${APP_VERSION}`;
 
 // Recursos locales precargados en la instalación
 const PRECACHE = [
